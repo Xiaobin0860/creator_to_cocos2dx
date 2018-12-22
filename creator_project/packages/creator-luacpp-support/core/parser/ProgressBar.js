@@ -16,17 +16,24 @@ class ProgressBar extends Node {
         // background sprite
         let bg_component = Node.get_node_component_of_type(this._node_data, 'cc.Sprite');
         if (bg_component._spriteFrame)
-            this._properties.backgroundSpriteFrameName = state._assetpath + Utils.get_sprite_frame_name_by_uuid(bg_component._spriteFrame.__uuid__);
+            this._properties.backgroundSpriteFrameName = Utils.get_sprite_frame_name_by_uuid(bg_component._spriteFrame.__uuid__);
 
         let bar_component = Node.get_node_component_of_type(this._node_data, 'cc.ProgressBar');
         this._properties.percent = bar_component._N$progress * 100;
+
+        this._node_data._children.forEach(function(item) {
+            let child = state._json_data[item.__id__];
+            if (child._name === 'bar') {    
+                this.add_property_rgb('barColor', '_color', child);
+            }
+        }.bind(this));
 
         // texture of progress bar
         let bar_sprite = bar_component._N$barSprite;
         if (bar_sprite) {
             let bar_sprite_data = state._json_data[bar_sprite.__id__];
             let bar_sprite_uuid = bar_sprite_data._spriteFrame.__uuid__;
-            this._properties.barSpriteFrameName = state._assetpath + Utils.get_sprite_frame_name_by_uuid(bar_sprite_uuid);
+            this._properties.barSpriteFrameName = Utils.get_sprite_frame_name_by_uuid(bar_sprite_uuid);
             this._properties.barSpriteType = bar_sprite_data._type;
 
             // should remove the child: bar sprite node
