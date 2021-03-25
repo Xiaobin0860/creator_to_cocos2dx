@@ -10,13 +10,16 @@ class Constants{};
 Constants.PACKAGE_NAME = 'creator-luacpp-support';
 // root of the this plugin 
 Constants.PACKAGE_PATH = Editor.url('packages://' + Constants.PACKAGE_NAME + '/');
+Constants.WORK_PATH = Constants.PACKAGE_PATH;
 // root of creator project
 if (process && process.type === 'renderer')
-    Constants.PROJECT_PATH = Editor.remote.projectInfo.path;
+    Constants.PROJECT_PATH = Editor.remote.Project.path;
 else
-    Constants.PROJECT_PATH = Editor.projectInfo.path;
+    Constants.PROJECT_PATH = Editor.Project.path;
 // path of `assets` folder
 Constants.ASSETS_PATH = Path.join(Constants.PROJECT_PATH, 'assets');
+// path of `atlases` folder
+Constants.ATLASES_PATH = Path.join(Constants.PROJECT_PATH, 'atlases');
 // path of `temp` folder
 Constants.TEMP_PATH = Path.join(Constants.PROJECT_PATH, 'temp');
 // path of `temp/internal`
@@ -43,7 +46,10 @@ Constants.PROFILE_DEFAULTS = {
     path: '',
     autoBuild: false,
     exportResourceOnly: false,
-    exportResourceDynamicallyLoaded: false
+    exportResourceDynamicallyLoaded: false,
+    exportSpriteSheet: false,
+    imageRepeatCheck: false,
+    unuseImageCheck: false
 };
 
 module.exports = Constants;

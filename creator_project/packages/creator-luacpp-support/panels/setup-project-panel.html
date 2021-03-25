@@ -35,13 +35,46 @@
             Auto Build After Scene Saved
         </ui-checkbox>
     </ui-prop>
+
+    <ui-prop name="Export SpriteSheet">
+        <ui-checkbox class="flex-1" v-value="profileProject.data.exportSpriteSheet" v-on:confirm="_onChangeExportSpriteSheet">
+            Export SpriteSheet
+        </ui-checkbox>
+    </ui-prop>
+
+    <ui-prop name="Export Assert" auto-height>
+        <div>
+            <ul style="border-style: solid; border-width: 1px; border-color: #888; border-radius: 2px; padding: 10px; overflow: auto; height: 280px;">
+                <ui-checkbox class="flex-1" v-value="selectall" v-on:confirm="_onChangeSelectAllAssert">
+                   Select All
+               </ui-checkbox>
+               <hr/>
+               <ui-checkbox class="flex-1" v-for="item in selectedAsserts" v-value="item.select" v-on:confirm="_onChangeSelectOneAssert" :key="item.name" style="display: flex;padding-top: 4px;" >
+               <li style="display: inline; padding-left: 3px;">{{item.name}}</li>
+               </ui-checkbox>
+           </ul>
+           <span>*单独导出时，其依赖合图文件夹下的场景也将自动导出</span>
+        </div>
+    </ui-prop>
+
+    <ui-prop name="Image Repeat Check">
+        <ui-checkbox class="flex-1" v-value="profileProject.data.imageRepeatCheck" v-on:confirm="_onChangeImageRepeatCheck">
+            检查勾选场景重复添加的图片
+        </ui-checkbox>
+    </ui-prop>
+
+    <ui-prop name="Unuse Image Check">
+        <ui-checkbox class="flex-1" v-disabled="!selectall" v-value="profileProject.data.unuseImageCheck" v-on:confirm="_onUnuseImageCheck">
+            检查未使用的图片（全部导出时可选）
+        </ui-checkbox>
+    </ui-prop>
 </section>
 
 <footer class="group layout horizontal center">
     <ui-button
         class="green"
         v-on:confirm="_onBuildClick"
-        v-disabled="buildState!=='sleep'&&buildState!=='finish'"
+        v-disabled="buildState!=='sleep'&&buildState!=='finish'&&buildState!=='error'"
     >
         Build
     </ui-button>
@@ -49,7 +82,7 @@
     <ui-button
         class="green"
         v-on:confirm="_onSetupClick"
-        v-disabled="buildState!=='sleep'&&buildState!=='finish'"
+        v-disabled="buildState!=='sleep'&&buildState!=='finish'&&buildState!=='error'"
     >
         Save & Close
     </ui-button>

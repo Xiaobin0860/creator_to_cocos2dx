@@ -16,10 +16,10 @@
         "main": "panels/setup-project-panel.js",
         "type": "dockable",
         "title": "Setup Target Project",
-        "width": 640,
-        "min-width": 320,
-        "height": 480,
-        "min-height": 330 
+        "width": 620,
+        "min-width": 580,
+        "height": 700,
+        "min-height": 700
     },
     "profiles": {
         "project": {
@@ -27,7 +27,9 @@
             "path": "",
             "autoBuild": false,
             "exportResourceOnly": false,
-            "exportResourceDynamicallyLoaded": false
+            "exportResourceDynamicallyLoaded": false,
+            "exportSpriteSheet": false,
+            "imageRepeatCheck": false
         }
     }
 }

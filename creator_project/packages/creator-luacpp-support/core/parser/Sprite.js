@@ -18,7 +18,7 @@ class Sprite extends Node {
         if (component && component._spriteFrame) {
             let sprite_frame_uuid = component._spriteFrame.__uuid__;
             
-            name = get_sprite_frame_name_by_uuid(sprite_frame_uuid);
+            let name = get_sprite_frame_name_by_uuid(sprite_frame_uuid);
             if (name) {
                 this._properties['spriteFrameName'] = name
                 this._properties.spriteType = Sprite.SPRITE_TYPES[component._type];

@@ -3,6 +3,12 @@
  */
 class State {
     constructor() {
+        //atlas info
+        this._atlases = {};
+
+        this._alldependence = [];
+        this._alldependenceDetail = {};
+
         this.reset();
     }
 
@@ -23,6 +29,13 @@ class State {
         // key is uuid, value is { relative_path: '', full_path: '' }
         // need to use the information to copy resources
         this._uuid = {};
+
+        // current process fire
+        this._currentFireFolder = '';
+
+        // the .fire file filter
+        this._dependence = [];
+        this._dependencePath = [];
 
         this._design_resolution = null;
 

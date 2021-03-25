@@ -12,7 +12,7 @@ class Mask extends Node {
         super.parse_properties();
 
         // Move Node properties into 'node' and clean _properties
-        this._properties = {node: this._properties};
+        this._properties = { node: this._properties };
 
         let component = Node.get_node_component_of_type(this._node_data, 'cc.Mask');
 
@@ -20,11 +20,13 @@ class Mask extends Node {
         this.add_property_bool('inverted', '_N$inverted', component);
 
         if (this._properties.type === 'Ellipse')
-            this.add_property_int('segments', '_segements', component);
+            this.add_property_int('segments', '_segments', component);
 
         if (this._properties.type === 'ImageStencil') {
             this.add_property_int('alphaThreshold', '_N$alphaThreshold', component);
-            this._properties.spriteFrame = Utils.get_sprite_frame_name_by_uuid(component._N$spriteFrame.__uuid__);
+            if (component._spriteFrame) {
+                this._properties.spriteFrame = Utils.get_sprite_frame_name_by_uuid(component._spriteFrame.__uuid__);
+            }
         }
     }
 }

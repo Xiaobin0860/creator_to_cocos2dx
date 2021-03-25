@@ -18,8 +18,12 @@ class Button extends Node {
         this._properties.ignoreContentAdaptWithSize = false;
 
         // normal sprite: get from sprite component
-        if (spr_component && spr_component._spriteFrame)
-            this._properties.spriteFrameName = get_sprite_frame_name_by_uuid(spr_component._spriteFrame.__uuid__);
+        if (spr_component && spr_component._spriteFrame) {
+            let name = get_sprite_frame_name_by_uuid(spr_component._spriteFrame.__uuid__);
+            if (name) {
+                this._properties.spriteFrameName = name;
+            }
+        }
         
         // transition
         let transition = but_component.transition;

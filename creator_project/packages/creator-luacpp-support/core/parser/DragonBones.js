@@ -27,9 +27,13 @@ class DragonBones extends Node {
             this._properties.boneDataPath = state._assetpath + bone_data_path_info.relative_path;
 
             // bone data name
-            let bone_data = fs.readFileSync(bone_data_path_info.fullpath);
+            //can't parse .dbbin file
+          /*  let bone_data = fs.readFileSync(bone_data_path_info.fullpath);
             let bone_data_json = JSON.parse(bone_data);
             this._properties.boneDataName = bone_data_json.name;
+            */
+            
+           this._properties.boneDataName = bone_data_path_info.relative_path.match(/[\\/](\w+)_ske./)[1]
         }
         
         // texture data path and texture path

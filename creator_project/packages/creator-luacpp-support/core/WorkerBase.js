@@ -35,8 +35,8 @@ class WorkerBase {
 function registerWorker(workerClass, runEvent) {
     Electron.ipcRenderer.on('creator-luacpp-support:' + runEvent, (event, state, opts) => {
         let worker = new workerClass(opts);
-        worker.run(state, () => {
-            event.reply();
+        worker.run(state, (err) => {
+            event.reply(err);
         });
     });
 }

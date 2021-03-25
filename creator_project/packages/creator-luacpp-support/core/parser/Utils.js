@@ -2,6 +2,9 @@ const path = require('path');
 const fs = require('fs');
 const state = require('./Global').state;
 const Utils = require('../Utils');
+const Constants = require('../Constants');
+const plist = require('../plist');
+let exportAtlas = Editor.remote.Profile.load('profile://project/creator-luacpp-support.json', Constants.PROFILE_DEFAULTS).data.exportSpriteSheet;
 
 /**
  * Get resource path by uuid.
@@ -9,7 +12,7 @@ const Utils = require('../Utils');
  * @fullpath: full path of the resource
  * @relative_path: relative path to assets folder or creator default asset path
  */
-let get_relative_full_path_by_uuid = function(uuid) {
+let get_relative_full_path_by_uuid = function (uuid) {
     if (uuid in state._uuid)
         return state._uuid[uuid];
 
@@ -22,12 +25,16 @@ let get_relative_full_path_by_uuid = function(uuid) {
         fullpath: fullpath,
         relative_path: relative_path
     };
+    //needn't export dynamic texture
+    if (relative_path.split(path.sep)[0] == 'dynamic') {
+        return null
+    }
     state._uuid[uuid] = result;
 
     return result;
 }
 
-let get_sprite_frame_json_by_uuid = function(uuid) {
+let get_sprite_frame_json_by_uuid = function (uuid) {
     let jsonfile = uuidinfos[uuid];
     if (jsonfile) {
         let contents = fs.readFileSync(jsonfile);
@@ -38,9 +45,9 @@ let get_sprite_frame_json_by_uuid = function(uuid) {
         return null;
 }
 
-let is_sprite_frame_from_texture_packer = function(uuid) {
+let is_sprite_frame_from_texture_packer = function (uuid) {
     let json = get_sprite_frame_json_by_uuid(uuid);
-    if (json) 
+    if (json)
         return json.content.atlas !== '';
     else
         return false;
@@ -50,7 +57,7 @@ let is_sprite_frame_from_texture_packer = function(uuid) {
 /**
  * The sprite frame name will include path information if it is not a texture packer
  */
-let get_sprite_frame_name_by_uuid = function(uuid) {
+let get_sprite_frame_name_by_uuid = function (uuid) {
     if (uuid in state._sprite_frames) {
         let uuid_info = state._sprite_frames[uuid];
         if (uuid_info.is_texture_packer)
@@ -76,26 +83,123 @@ let get_sprite_frame_name_by_uuid = function(uuid) {
             // handle texture path
 
             let path_info = get_relative_full_path_by_uuid(texture_uuid);
-
-            // get texture frames information
-            let meta = Editor.remote.assetdb._uuid2meta[metauuid].__subMetas__;
+            // dynamic
+            if (!path_info) {
+                return null
+            }
             let found_sprite_frame_name = null;
-            Object.keys(meta).forEach(sprite_frame_name => {
-                let sprite_frame_info = meta[sprite_frame_name];
-                sprite_frame_info.name = sprite_frame_name;
-                sprite_frame_info.texture_path = path_info.relative_path;
-                sprite_frame_info.is_texture_packer = is_texture_packer;
-
-                let sprite_frame_uuid = sprite_frame_info.uuid; 
-                state._sprite_frames[sprite_frame_uuid] = sprite_frame_info;
-
-                if (sprite_frame_uuid == uuid) {
-                    if (is_texture_packer)
-                        found_sprite_frame_name = sprite_frame_name;
-                    else
-                        found_sprite_frame_name = sprite_frame_info.texture_path;
+            let meta = null;
+            for (var i = 0; i < 5; i++) {
+                try {
+                    // get texture frames information
+                    meta = Editor.remote.assetdb._uuid2meta[metauuid].__subMetas__;
+                    break;
+                } catch (e) {
+                    if (i == 4) {
+                        let jsonfile = uuidinfos[uuid];
+                        Utils.log('can not get sprite frame name of uuid ' + uuid);
+                        Utils.log('jsonfile: ' + jsonfile);
+                        Utils.log('metauuid: ' + metauuid);
+                        let contents = fs.readFileSync(jsonfile);
+                        Utils.log('contents: ' + contents);
+                        throw (e);
+                    } else {
+                        console.log('retry ' + metauuid, i);
+                    }
                 }
-            });
+            }
+
+            let match = path_info.relative_path.match(/[\\/]image[\\/]/)
+
+            if (!is_texture_packer && exportAtlas && match != null) {
+                Object.keys(meta).forEach(sprite_frame_name => {
+                    let data = meta[sprite_frame_name];
+                    let folder_name = path_info.relative_path.substring(0, match.index)
+                    let sprite_frame_info = new Object();
+                    Object.keys(data).forEach(key => {
+                        sprite_frame_info[key] = data[key];
+                    })
+                    sprite_frame_info.name = folder_name + "/" + sprite_frame_name + '.png';
+                    sprite_frame_info.texture_path = path_info.relative_path;
+                    sprite_frame_info.is_texture_packer = true;
+
+                    if (!(folder_name in state._atlases)) {
+                        //依赖项，未打包，需要先打包
+                        state._dependence.unshift(folder_name)
+                        buildAtlasesSync(path.join(Constants.ASSETS_PATH,sprite_frame_info.name))
+                    }
+
+                    if (folder_name in state._atlases) {
+                        let sprite_png = sprite_frame_name + '.png'
+
+                        let atlas_info = state._atlases[folder_name][sprite_png]
+
+                        if (atlas_info && folder_name != state._currentFireFolder) {
+                            //如果依赖项是非自身文件夹，添加记录
+                            state._dependencePath.unshift(sprite_frame_info.texture_path)
+                        }
+
+                        atlas_info = atlas_info || state._atlases['Share'][sprite_png];
+                        if (atlas_info) {
+
+                            let reg = /-?\d+,-?\d+/
+                            let rect_origin = atlas_info.textureRect.match(reg)[0].split(',');
+                            sprite_frame_info.trimX = parseInt(rect_origin[0]);
+                            sprite_frame_info.trimY = parseInt(rect_origin[1]);
+                            let size = atlas_info.spriteSize.match(reg)[0].split(',');
+                            sprite_frame_info.width = parseInt(size[0]);
+                            sprite_frame_info.height = parseInt(size[1]);
+                            sprite_frame_info.rotated = atlas_info.textureRotated;
+                            let offset = atlas_info.spriteOffset.match(reg)[0].split(',');
+                            sprite_frame_info.offsetX = parseInt(offset[0]);
+                            sprite_frame_info.offsetY = parseInt(offset[1]);
+                            let plist_png = folder_name + '.png'
+                            sprite_frame_info.texture_path = path.join(folder_name, plist_png)
+                            let uuid_data = state._uuid[texture_uuid]
+
+                            if (uuid_data.ofullpath == null) {
+                                uuid_data.ofullpath = uuid_data.fullpath
+                            }
+
+                            if (uuid_data.orelative_path == null) {
+                                uuid_data.orelative_path = uuid_data.relative_path
+                            }
+
+                            uuid_data.fullpath = uuid_data.fullpath.replace(/image\S+/, plist_png);
+                            uuid_data.fullpath = uuid_data.fullpath.replace(Constants.ASSETS_PATH, Constants.ATLASES_PATH);
+                            uuid_data.relative_path = uuid_data.fullpath.substr(Constants.ASSETS_PATH.length + 1);
+                        } else {
+                            Utils.log(folder_name + '\\image\\' + sprite_frame_name + '.png not find')
+                        }
+                    }else {
+                        Utils.log('no atlases: ' + folder_name);
+                    }
+
+                    let sprite_frame_uuid = sprite_frame_info.uuid;
+                    state._sprite_frames[sprite_frame_uuid] = sprite_frame_info;
+
+                    if (sprite_frame_uuid == uuid) {
+                        found_sprite_frame_name = sprite_frame_info.name;
+                    }
+                });
+            } else {
+                Object.keys(meta).forEach(sprite_frame_name => {
+                    //Utils.log('sprite_frame_name: ' + sprite_frame_name)
+                    let sprite_frame_info = meta[sprite_frame_name];
+                    sprite_frame_info.name = sprite_frame_name;
+                    sprite_frame_info.texture_path = path_info.relative_path;
+                    sprite_frame_info.is_texture_packer = is_texture_packer;
+
+                    let sprite_frame_uuid = sprite_frame_info.uuid;
+                    state._sprite_frames[sprite_frame_uuid] = sprite_frame_info;
+                    if (sprite_frame_uuid == uuid) {
+                        if (is_texture_packer)
+                            found_sprite_frame_name = sprite_frame_name;
+                        else
+                            found_sprite_frame_name = sprite_frame_info.texture_path;
+                    }
+                });
+            }
             return found_sprite_frame_name;
         }
         else {
@@ -105,7 +209,7 @@ let get_sprite_frame_name_by_uuid = function(uuid) {
     }
 }
 
-let get_font_path_by_uuid = function(uuid) {
+let get_font_path_by_uuid = function (uuid) {
     if (uuid in state._uuid)
         return state._uuid[uuid].relative_path;
     else {
@@ -135,8 +239,8 @@ let get_font_path_by_uuid = function(uuid) {
             }
             else if (type === 'cc.TTFFont') {
                 state._uuid[uuid] = {
-                    fullpath: path.join(res_dir, contents_json._rawFiles[0]),
-                    relative_path: current_dir + '/' + contents_json._rawFiles[0]
+                    fullpath: path.join(res_dir, contents_json._native),
+                    relative_path: current_dir + '/' + contents_json._native
                 }
 
                 return state._uuid[uuid].relative_path;
@@ -164,16 +268,16 @@ let get_spine_info_by_uuid = function (uuid) {
         let contents = fs.readFileSync(jsonfile);
         let contents_json = JSON.parse(contents);
         let current_dir = path.basename(jsonfile, '.json');
-        
+
         let res_dir = path.join(path.dirname(jsonfile), uuid);
-        
+
         let files = fs.readdirSync(res_dir);
-        files.forEach(function(file) {
+        files.forEach(function (file) {
             let fullpath = path.join(res_dir, file);
             //FIXME: have more than one json file?
-            state._uuid[uuid] = {fullpath: fullpath, relative_path: current_dir + '/' + file};
+            state._uuid[uuid] = { fullpath: fullpath, relative_path: current_dir + '/' + file };
         });
-        
+
         // get atlas path
         state._uuid[uuid].atlas_url = get_relative_full_path_by_uuid(contents_json.atlasUrl.__uuid__);
         // add to _uuid to copy resources
@@ -204,7 +308,7 @@ let get_tiledmap_path_by_uuid = function (uuid) {
 
         // record texture path
         let tmx_texture_info = {};
-        contents_json.textures.forEach(function(texture_info) {
+        contents_json.textures.forEach(function (texture_info) {
             tmx_texture_info = get_relative_full_path_by_uuid(texture_info.__uuid__);
         });
 
@@ -221,7 +325,7 @@ let get_tiledmap_path_by_uuid = function (uuid) {
 }
 
 let DEBUG = false;
-log = function(s) {
+log = function (s) {
     if (DEBUG)
         Utils.log(s);
 }
@@ -289,7 +393,7 @@ let create_node = function (node_type, node_data) {
         n = new PageView(node_data);
     else if (node_type === 'cc.Mask')
         n = new Mask(node_data);
-    else if (node_type === 'cc.Prefab') 
+    else if (node_type === 'cc.Prefab')
         n = new Prefab(node_data);
     else if (node_type === 'dragonBones.ArmatureDisplay')
         n = new DragonBones(node_data);
@@ -298,7 +402,7 @@ let create_node = function (node_type, node_data) {
 
     if (n != null)
         n.parse_properties();
-       
+
     return n;
 }
 
@@ -318,6 +422,90 @@ let remove_child_by_id = function (node, id) {
     }
 }
 
+
+let buildAtlasesSync = function(filename) {
+    let sub_folder = path.dirname(filename).substr(Constants.ASSETS_PATH.length + 1);
+
+    let out_path = path.join(Constants.ATLASES_PATH, sub_folder, sub_folder);
+    let file_plist = out_path + '.plist'
+    let imagePath = path.join(Constants.ASSETS_PATH, sub_folder, 'image');
+    let rt = 0;
+    if (fs.existsSync(imagePath)){
+        //let params = [Path.join(Constants.ASSETS_PATH, sub_folder, 'image'), '--sheet', out_path + '.png', '--data', file_plist, '--texture-format', 'png8',
+        //    '--dither-type', 'PngQuantHigh', '--format', 'cocos2d-x'];
+        let params = [imagePath, '--sheet', out_path + '.png', '--data', file_plist, '--format', 'cocos2d-x', '--shape-padding', '2', '--quiet'];
+        rt = Utils.runcommandSync('TexturePacker', params);
+        if (rt === 0) {
+            Utils.log("export atlases success")
+        }
+        else {
+            throw new Error("buildAtlasesSync error!!!");
+        }
+        if (fs.existsSync(file_plist)) {
+            let file_data = fs.readFileSync(file_plist, 'utf8')
+            let contents = plist.parse(file_data);
+            state._atlases[sub_folder] = contents['frames'];
+        }
+    }
+    
+    return rt
+}
+
+
+let buildAtlases = function(filenames, cb) {
+    let builded = {}
+    let i = 0
+    filenames.forEach(function (filename) {
+        let sub_folder = path.dirname(filename).substr(Constants.ASSETS_PATH.length + 1);
+        let imagePath = path.join(Constants.ASSETS_PATH, sub_folder, 'image');
+        
+        let hasPNG = false;
+        if (fs.existsSync(imagePath)) {
+            let files = fs.readdirSync(imagePath);//需要用到同步读取
+            for (let i = 0, len = files.length; i < len; ++i) {
+                let file = files[i];
+                if(/\.png$/.test(file)) {
+                    hasPNG = true;
+                    break;
+                }
+            }
+        }
+
+        if (!builded[sub_folder] && hasPNG ) {
+            builded[sub_folder] = true;
+            let out_path = path.join(Constants.ATLASES_PATH, sub_folder, sub_folder);
+            let file_plist = out_path + '.plist'
+            //let params = [Path.join(Constants.ASSETS_PATH, sub_folder, 'image'), '--sheet', out_path + '.png', '--data', file_plist, '--texture-format', 'png8',
+            //    '--dither-type', 'PngQuantHigh', '--format', 'cocos2d-x'];
+            
+            let params = [imagePath, '--sheet', out_path + '.png', '--data', file_plist, '--format', 'cocos2d-x', '--shape-padding', '2', '--quiet'];
+            Utils.runcommand('TexturePacker', params, (st) => {
+                if (st !== 0) {
+                    console.warn(imagePath)
+                    throw new Error("buildAtlases error!!!");
+                }
+                if (fs.existsSync(file_plist)) {
+                    let file_data = fs.readFileSync(file_plist, 'utf8')
+                    let contents = plist.parse(file_data);
+                    state._atlases[sub_folder] = contents['frames'];
+                }else {
+
+                }
+                ++i;
+                if (i === filenames.length) {
+                    Utils.log('export atlases success');
+                    cb();
+                }
+            })
+            
+        } else {
+            ++i;
+            if (i === filenames.length)
+                cb();
+        }
+    });
+}
+
 module.exports = {
     get_relative_full_path_by_uuid: get_relative_full_path_by_uuid,
     get_sprite_frame_name_by_uuid: get_sprite_frame_name_by_uuid,
@@ -326,6 +514,7 @@ module.exports = {
     get_tiledmap_path_by_uuid: get_tiledmap_path_by_uuid,
     create_node: create_node,
     log: log,
+    buildAtlases: buildAtlases,
     remove_child_by_id: remove_child_by_id,
     get_sprite_frame_json_by_uuid: get_sprite_frame_json_by_uuid,
     is_sprite_frame_from_texture_packer: is_sprite_frame_from_texture_packer,

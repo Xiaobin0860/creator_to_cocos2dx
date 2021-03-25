@@ -134,6 +134,8 @@ table Label
     overflowType:LabelOverflowType;
     enableWrap:bool;
     outline:LabelOutline;
+    spacingX:float;
+    bold:bool;
 }
 
 table RichText

@@ -16,22 +16,27 @@ let PACKAGE_VERSION = '';
 const Project = require('./core/Project');
 
 let _buildState = 'sleep';
+// let _module_loaded = false;
 
 function _fetchVersion() {
     const Constants = require('./core/Constants');
-    let info = Editor.Package.packageInfo(Editor.Package.packagePath(Constants.PACKAGE_NAME));
+    Constants.WORK_PATH = Editor.Package.packagePath(Constants.PACKAGE_NAME);
+    let info = Editor.Package.packageInfo(Constants.WORK_PATH);
     PACKAGE_VERSION = info.version;
 }
 
 function _runWorker(url, message, project) {
     let buildWorker;
+    
     Editor.App.spawnWorker(url, (worker) => {
         buildWorker = worker;
+        
         let opts = {version: PACKAGE_VERSION, debug: DEBUG_WORKER};
-        let state = project.dumpState();
+        let state = project.dumpState(project);
         buildWorker.send(message, state, opts, (err) => {
             if (err) {
                 Editor.error(err);
+                return;
             }
 
             if (buildWorker) {
@@ -46,6 +51,7 @@ function _checkProject(opt) {
     let project = new Project(opt.profile);
 
     if (project.validate()) {
+        project.selectedAsserts = opt.selectedAsserts;
         return project;
     } else {
         if (opt.reason !== 'scene:saved') {
@@ -67,7 +73,11 @@ function _checkProject(opt) {
 // opt = { reason: xxx, profile: yyy}
 // 'profile' may be null
 function _build(opt) {
-    if (_buildState !== 'sleep' && _buildState !== 'finish') {
+    // if (!_module_loaded) {
+    //     Editor.warn('[LuaCpp Support] not loaded!');
+    //     return;
+    // }
+    if (_buildState !== 'sleep' && _buildState !== 'finish' && _buildState !== 'error') {
         Editor.warn('[LuaCpp Support] Building in progress');
         return;
     }
@@ -93,10 +103,14 @@ function _build(opt) {
 module.exports = {
     load() {
         _fetchVersion();
-        Editor.log('[LuaCPP Support] version ' + PACKAGE_VERSION);
+        Editor.log('[LuaCPP Support] load version ' + PACKAGE_VERSION);
+        Editor.log('[LuaCPP Support] path: ' + Constants.WORK_PATH);
+        // _module_loaded = true;
     },
 
     unload() {
+        // _module_loaded = false;
+        Editor.log('[LuaCPP Support] unload version ' + PACKAGE_VERSION);
     },
 
     messages: {
@@ -123,7 +137,7 @@ module.exports = {
         'creator-luacpp-support:state-changed'(event, state, progress) {
             _buildState = state;
             Editor.Ipc.sendToWins('creator-luacpp-support:state-changed', state, progress);
-        }
+        },
     }
 };
 

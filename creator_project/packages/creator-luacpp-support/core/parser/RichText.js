@@ -28,7 +28,8 @@ class RichText extends Node {
         // add sprite frames if there is img component
         if (component._N$imageAtlas) {
             // find sprite frame name
-            regex = /<img src=\'(\w+)\'/;
+            regex = /<img[ ]+src=\'(\w+)\'/;
+            // console.log(text, text.match(regex))
             let resource = text.match(regex)[1];
 
             // add sprite frames

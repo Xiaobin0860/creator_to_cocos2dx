@@ -62,6 +62,12 @@ class Label extends Node {
 
             this.add_property_int('lineHeight' ,'_lineHeight', component);
         }
+       // super.parse_ex_properties();
+       let ex_component = Node.get_node_component_of_ex(this._node_data);
+       if (ex_component) {
+           this.add_property_int('spacingX', '_spacingX', ex_component);
+           this.add_property_bool('bold', '_bold', ex_component);
+       }
     }
 }
 Label.H_ALIGNMENTS = ['Left', 'Center', 'Right'];

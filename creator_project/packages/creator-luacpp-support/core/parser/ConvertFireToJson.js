@@ -16,7 +16,7 @@ class FireParser {
     constructor() {
         this._state = state;
         this._json_file = null;
-        this._json_output = {version: Constants.VERDION, root: {}};
+        this._json_output = { version: Constants.VERDION, root: {} };
         this._creatorassets = null;
     }
 
@@ -39,22 +39,21 @@ class FireParser {
 
     to_json_setup_sprite_frames() {
         let sprite_frames = [];
-
         for (let sprite_frame_uuid in state._sprite_frames) {
             let sprite_frame = state._sprite_frames[sprite_frame_uuid];
 
             let frame = {
                 name: get_sprite_frame_name_by_uuid(sprite_frame_uuid),
                 texturePath: state._assetpath + sprite_frame.texture_path,
-                rect: {x:sprite_frame.trimX, y:sprite_frame.trimY, w:sprite_frame.width, h:sprite_frame.height},
-                offset: {x:sprite_frame.offsetX, y:sprite_frame.offsetY},
+                rect: { x: sprite_frame.trimX, y: sprite_frame.trimY, w: sprite_frame.width, h: sprite_frame.height },
+                offset: { x: sprite_frame.offsetX, y: sprite_frame.offsetY },
                 rotated: sprite_frame.rotated,
-                originalSize: {w:sprite_frame.rawWidth, h:sprite_frame.rawHeight}
+                originalSize: { w: sprite_frame.rawWidth, h: sprite_frame.rawHeight }
             };
             // does it have a capInsets?
-            if (sprite_frame.borderTop != 0 || sprite_frame.borderBottom != 0 || 
+            if (sprite_frame.borderTop != 0 || sprite_frame.borderBottom != 0 ||
                 sprite_frame.borderLeft != 0 || sprite_frame.borderRgith != 0) {
-                
+
                 frame.centerRect = {
                     x: sprite_frame.borderLeft,
                     y: sprite_frame.borderTop,
@@ -73,7 +72,7 @@ class FireParser {
         let collisionMatrix = Editor.remote.Profile.load('profile://project/project.json').data['collision-matrix'];
         this._json_output.collisionMatrix = [];
         for (let i = 0, len = collisionMatrix.length; i < len; ++i) {
-            let collisionLine = {value: collisionMatrix[i]};
+            let collisionLine = { value: collisionMatrix[i] };
             this._json_output.collisionMatrix.push(collisionLine);
         }
     }
@@ -90,6 +89,9 @@ class FireParser {
         this._json_file = this.create_file(json_name);
         state._assetpath = assetpath;
 
+        //Utils.log('ToJson: ' + filename);
+        //console.log('.');
+        console.log('ToJson: ' + filename);
         state._json_data = JSON.parse(fs.readFileSync(filename));
 
         state._json_data.forEach(obj => {
@@ -103,11 +105,12 @@ class FireParser {
                 this.to_json_setup();
                 let jsonNode = scene_obj.to_json(0, 0);
                 this._json_output.root = jsonNode;
-                let dump = JSON.stringify(this._json_output, null, '\t').replace(/\\\\/g,'/');
+                let dump = JSON.stringify(this._json_output, null, '\t').replace(/\\\\/g, '/');
                 fs.writeSync(this._json_file, dump);
                 fs.close(this._json_file);
             }
         });
+        //Utils.log('ToJson ok.');
     }
 }
 
@@ -118,15 +121,47 @@ function parse_fire(filenames, assetpath, path_to_json_files, uuidmaps) {
     uuidinfos = uuidmaps;
 
     let uuid = {};
-    filenames.forEach(function(filename) {
+    filenames.forEach(function (filename) {
         state.reset();
         let parser = new FireParser();
+
+        let match = filename.replace(Constants.ASSETS_PATH, '').match(/^[\\/](\w+)[\\/]/)
+        state._currentFireFolder = match[1];
         parser.run(filename, assetpath, path_to_json_files)
-        for(let key in state._uuid) {
-            if (state._uuid.hasOwnProperty(key))
+        for (let key in state._uuid) {
+            if (state._uuid.hasOwnProperty(key)) {
                 uuid[key] = state._uuid[key];
+            }
+        }
+
+        if (state._dependencePath.length>0) {
+            let fireName = filename.replace(Constants.ASSETS_PATH, '');
+            state._alldependenceDetail[fireName] = state._dependencePath;
+        }
+
+        //每导完一个，检查依赖项
+        if (state._dependence.length>0) {
+            let files = Utils._getFilesWithExt(Constants.ASSETS_PATH, ['.fire'], true);
+    
+            files = files.filter((item, index)=> {
+                let hasthis = false;
+                for (let i=0;i<state._dependence.length;i++) {
+                    if(item.indexOf(Constants.ASSETS_PATH+"\\"+state._dependence[i])>-1 || item.indexOf(Constants.ASSETS_PATH+"/"+state._dependence[i])>-1){
+                        if (state._alldependence.indexOf(state._dependence[i])<0) {
+                            state._alldependence.unshift(state._dependence[i])
+                        }
+                        hasthis = true
+                        break;
+                    }
+                }
+                return hasthis;
+            });
+    
+            let rtuuids = parse_fire(files,assetpath,path_to_json_files,uuidmaps)
+            uuid = Object.assign({}, uuid, rtuuids );
         }
     });
+
     return uuid;
 }
 
